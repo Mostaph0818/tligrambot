@@ -1,0 +1,44 @@
+//@version=6
+indicator("ICT SMC Multi-Symbol", overlay=true)
+
+pairs = input.string("XAUUSD,XAGUSD,EURUSD,GBPUSD,NAS100,USOIL,US100,DXY", "Symbols")
+htfTF = input.timeframe("D", "Higher Timeframe")
+
+checkAll(sym) =>
+    [c, h, l, hi20, lo20, l2, h2] = request.security(sym, timeframe.period, [close, high, low, ta.highest(high, 20)[1], ta.lowest(low, 20)[1], low[2], high[2]])
+    [htfL2, htfH0, htfH2, htfL0, htfC1, htfO1, htfC0, htfH1] = request.security(sym, htfTF, [low[2], high[0], high[2], low[0], close[1], open[1], close[0], high[1]])
+    [ph, pl] = request.security(sym, timeframe.period, [ta.pivothigh(high, 8, 8), ta.pivotlow(low, 8, 8)])
+
+    bullLiq = l < lo20 and c > lo20
+    bearLiq = h > hi20 and c < hi20
+
+    htfBull = htfL2 > htfH0 or (htfC1 < htfO1 and htfC0 > htfH1)
+    htfBear = htfH2 < htfL0 or (htfC1 > htfO1 and htfC0 < htfL0)
+
+    bullFVG = l2 > h
+    bearFVG = h2 < l
+
+    bullMSS = not na(pl) and l < pl and c > h
+    bearMSS = not na(ph) and h > ph and c < l
+
+    buy  = htfBull and bullLiq and bullMSS and bullFVG
+    sell = htfBear and bearLiq and bearMSS and bearFVG
+
+    [buy, sell, c]
+
+symList = str.split(pairs, ",")
+tableY = 0
+
+for [i, sym] in symList
+    sym := str.trim(sym)
+    [buySig, sellSig, price] = checkAll(sym)
+    if buySig
+        alert("{\"side\":\"BUY\",\"ticker\":\"" + sym + "\",\"price\":" + str.tostring(price) + ",\"timeframe\":\"" + timeframe.period + "\"}", alert.freq_once_per_bar_close)
+        if barstate.islast
+            label.new(bar_index, high, "🟢 " + sym + " $" + str.tostring(price), style=label.style_label_left, color=color.new(#00ff00, 40), textcolor=color.white, size=size.small)
+            tableY := tableY + 1
+    if sellSig
+        alert("{\"side\":\"SELL\",\"ticker\":\"" + sym + "\",\"price\":" + str.tostring(price) + ",\"timeframe\":\"" + timeframe.period + "\"}", alert.freq_once_per_bar_close)
+        if barstate.islast
+            label.new(bar_index, low, "🔴 " + sym + " $" + str.tostring(price), style=label.style_label_right, color=color.new(#ff0000, 40), textcolor=color.white, size=size.small)
+            tableY := tableY + 1
