@@ -1,0 +1,90 @@
+//@version=5
+strategy("ICT Smart Money Concept", overlay=true, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=100, pyramiding=1, commission_type=strategy.commission.percent, commission_value=0.03)
+
+fvgLookback = input.int(100, "FVG Lookback", minval=10)
+obLookback  = input.int(100, "OB Lookback", minval=10)
+liqLookback = input.int(30, "Liquidity Lookback", minval=5)
+fvgBody     = input.bool(true, "Use Body (not wicks) for FVG")
+showFVG     = input.bool(true, "Show FVG Zones")
+showOB      = input.bool(true, "Show Order Blocks")
+showLiq     = input.bool(true, "Show Liquidity Levels")
+showSignals = input.bool(true, "Show Entry Signals")
+tpPercent   = input.float(1.5, "Take Profit %", step=0.1)
+slPercent   = input.float(0.5, "Stop Loss %", step=0.1)
+
+detectFVG() =>
+    bool bull = na, bool bear = na
+    float bullTop = na, float bullBot = na
+    float bearTop = na, float bearBot = na
+    for i = 0 to fvgLookback
+        hi0 = high[i]; lo0 = low[i]
+        hi2 = high[i+2]; lo2 = low[i+2]
+        if fvgBody
+            hi0 := close[i] > open[i] ? open[i] : close[i]
+            lo0 := close[i] < open[i] ? open[i] : close[i]
+            hi2 := close[i+2] > open[i+2] ? open[i+2] : close[i+2]
+            lo2 := close[i+2] < open[i+2] ? open[i+2] : close[i+2]
+        if lo2 > hi0
+            bull := true; bullTop := lo2; bullBot := hi0
+        if hi2 < lo0
+            bear := true; bearTop := lo0; bearBot := hi2
+    [bull, bear, bullTop, bullBot, bearTop, bearBot]
+
+detectOB() =>
+    bool bullOB = na, bool bearOB = na
+    float bullOBTop = na, float bullOBBot = na
+    float bearOBTop = na, float bearOBBot = na
+    int bullOBIdx = na, int bearOBIdx = na
+    for i = 0 to obLookback
+        if close[i+1] < open[i+1] and close[i] > high[i+1]
+            bullOB := true
+            bullOBTop := high[i+1]; bullOBBot := low[i+1]
+            bullOBIdx := i+1
+        if close[i+1] > open[i+1] and close[i] < low[i+1]
+            bearOB := true
+            bearOBTop := high[i+1]; bearOBBot := low[i+1]
+            bearOBIdx := i+1
+    [bullOB, bearOB, bullOBTop, bullOBBot, bearOBTop, bearOBBot, bullOBIdx, bearOBIdx]
+
+detectLiqSweep() =>
+    bool sweep = na, bool bearSweep = na
+    float recentHigh = ta.highest(high, liqLookback)[1]
+    float recentLow  = ta.lowest(low, liqLookback)[1]
+    if low < recentLow and close > recentLow
+        sweep := true
+    if high > recentHigh and close < recentHigh
+        bearSweep := true
+    [sweep, bearSweep, recentHigh, recentLow]
+
+[bullFVG, bearFVG, bullFVGTop, bullFVGBot, bearFVGTop, bearFVGBot] = detectFVG()
+[bullOB, bearOB, bullOBTop, bullOBBot, bearOBTop, bearOBBot, bullOBIdx, bearOBIdx] = detectOB()
+[bullSweep, bearSweep, recentHigh, recentLow] = detectLiqSweep()
+
+buySignal  = bullFVG and bullOB and bullSweep
+sellSignal = bearFVG and bearOB and bearSweep
+
+if buySignal
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Long TP/SL", "Long", profit=close * tpPercent / syminfo.mintick / 100, loss=close * slPercent / syminfo.mintick / 100)
+    strategy.alert_message("{\"side\":\"BUY\",\"ticker\":\"" + syminfo.ticker + "\",\"price\":" + str.tostring(close) + ",\"timeframe\":\"" + timeframe.period + "\",\"chartImg\":\"{{chart_image_url}}\"}")
+if sellSignal
+    strategy.entry("Short", strategy.short)
+    strategy.exit("Short TP/SL", "Short", profit=close * tpPercent / syminfo.mintick / 100, loss=close * slPercent / syminfo.mintick / 100)
+    strategy.alert_message("{\"side\":\"SELL\",\"ticker\":\"" + syminfo.ticker + "\",\"price\":" + str.tostring(close) + ",\"timeframe\":\"" + timeframe.period + "\",\"chartImg\":\"{{chart_image_url}}\"}")
+
+if showFVG and bullFVG
+    box.new(bar_index[2], bullFVGTop, bar_index, bullFVGBot, border_color=color.new(#00ff00, 70), bgcolor=color.new(#00ff00, 85), border_width=1)
+if showFVG and bearFVG
+    box.new(bar_index[2], bearFVGTop, bar_index, bearFVGBot, border_color=color.new(#ff0000, 70), bgcolor=color.new(#ff0000, 85), border_width=1)
+if showOB and bullOB
+    box.new(bar_index[bullOBIdx], bullOBTop, bar_index[bullOBIdx+5], bullOBBot, border_color=color.new(#00ff00, 60), bgcolor=color.new(#00ff00, 75), border_width=2)
+if showOB and bearOB
+    box.new(bar_index[bearOBIdx], bearOBTop, bar_index[bearOBIdx+5], bearOBBot, border_color=color.new(#ff0000, 60), bgcolor=color.new(#ff0000, 75), border_width=2)
+if showLiq
+    line.new(bar_index[liqLookback], recentHigh, bar_index, recentHigh, color=color.new(#ff6600, 50), style=line.style_dashed, width=1)
+    line.new(bar_index[liqLookback], recentLow, bar_index, recentLow, color=color.new(#0066ff, 50), style=line.style_dashed, width=1)
+if showSignals
+    if buySignal
+        label.new(bar_index, low, " BUY\nFVG+OB+Liq", style=label.style_label_up, color=color.new(#00ff00, 30), textcolor=color.white, size=size.small)
+    if sellSignal
+        label.new(bar_index, high, " SELL\nFVG+OB+Liq", style=label.style_label_down, color=color.new(#ff0000, 30), textcolor=color.white, size=size.small)
