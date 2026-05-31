@@ -41,26 +41,25 @@ def send_signal(chat_id, side, ticker, price, tf, chart_img=None):
         "parse_mode": "HTML"
     })
 
-@app.route("/webhook", methods=["POST"])
-def webhook():
-    data = request.get_json()
-    if not data:
-        return {"error": "no data"}, 400
-
-    side = data.get("side", "N/A")
-    ticker = data.get("ticker", "N/A")
-    price = data.get("price", "N/A")
-    tf = data.get("timeframe", "N/A")
-    chart_img = data.get("chartImg")
-
-    for chat_id in CHAT_IDS:
-        send_signal(chat_id, side, ticker, price, tf, chart_img)
-
-    return {"ok": True}, 200
-
+@app.route("/webhook", methods=["GET", "POST"])
 @app.route("/", methods=["GET"])
 def home():
-    return "ICT SMC Bot is running!", 200
+    if request.method == "POST":
+        data = request.get_json()
+        if not data:
+            return {"error": "no data"}, 400
+
+        side = data.get("side", "N/A")
+        ticker = data.get("ticker", "N/A")
+        price = data.get("price", "N/A")
+        tf = data.get("timeframe", "N/A")
+        chart_img = data.get("chartImg")
+
+        for chat_id in CHAT_IDS:
+            send_signal(chat_id, side, ticker, price, tf, chart_img)
+
+        return {"ok": True}, 200
+    return "ICT SMC Bot is running! ✅", 200
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
