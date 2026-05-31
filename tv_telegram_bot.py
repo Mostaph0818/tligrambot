@@ -4,7 +4,7 @@ import requests
 app = Flask(__name__)
 
 BOT_TOKEN = "8604351766:AAHaVEOUyeKX2IrcvNRlHfj_nt3eNqXo5yY"
-CHAT_IDS = ["8585638258"]
+CHAT_IDS = ["8585638258", "5992758516"]
 TELEGRAM_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 PHOTO_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
 
