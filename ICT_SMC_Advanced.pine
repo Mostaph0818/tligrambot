@@ -1,4 +1,4 @@
-//@version=6
+//@version=5
 strategy("ICT SMC Advanced", overlay=true, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=100, pyramiding=1)
 
 htf = input.timeframe("D", "Higher Timeframe (HTF)")
@@ -37,17 +37,18 @@ bearFVG = high[2] < low[0]
 buy  = htfBullZone and bullLiq and bullMSS and bullFVG
 sell = htfBearZone and bearLiq and bearMSS and bearFVG
 
+alertMsg(side) =>
+    "{\"side\":\"" + side + "\",\"ticker\":\"" + syminfo.ticker + "\",\"price\":" + str.tostring(close) + ",\"timeframe\":\"" + timeframe.period + "\",\"chartImg\":\"{{chart_image_url}}\"}"
+
 if buy
     strategy.entry("Long", strategy.long)
-    msg = "{\"side\":\"BUY\",\"ticker\":\"" + syminfo.ticker + "\",\"price\":" + str.tostring(close) + ",\"timeframe\":\"" + timeframe.period + "\",\"chartImg\":\"{{chart_image_url}}\"}"
-    strategy.alert_message(msg)
+    strategy.alert_message(alertMsg("BUY"))
     if showLbl
         label.new(bar_index, low, "BUY", style=label.style_label_up, color=color.new(#00ff00, 40), textcolor=color.white)
 
 if sell
     strategy.entry("Short", strategy.short)
-    msg := "{\"side\":\"SELL\",\"ticker\":\"" + syminfo.ticker + "\",\"price\":" + str.tostring(close) + ",\"timeframe\":\"" + timeframe.period + "\",\"chartImg\":\"{{chart_image_url}}\"}"
-    strategy.alert_message(msg)
+    strategy.alert_message(alertMsg("SELL"))
     if showLbl
         label.new(bar_index, high, "SELL", style=label.style_label_down, color=color.new(#ff0000, 40), textcolor=color.white)
 
