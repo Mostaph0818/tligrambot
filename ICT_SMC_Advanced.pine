@@ -1,0 +1,61 @@
+//@version=5
+strategy("ICT SMC Advanced", overlay=true, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=100, pyramiding=1)
+
+htf = input.timeframe("D", "Higher Timeframe (HTF)")
+fvgLook = input.int(50, "FVG Lookback", minval=10)
+liqLook = input.int(20, "Liq Lookback", minval=5)
+mssLen  = input.int(8, "MSS Length", minval=3)
+showLbl = input.bool(true, "Show Labels")
+
+// ========== HTF: Order Block or FVG ==========
+htfBullZone = request.security(syminfo.tickerid, htf,
+    low[2] > high[0] or (close[1] < open[1] and close[0] > high[1]))
+htfBearZone = request.security(syminfo.tickerid, htf,
+    high[2] < low[0] or (close[1] > open[1] and close[0] < low[1]))
+
+// ========== LTF: Liquidity Grab ==========
+hi = ta.highest(high, liqLook)[1]
+lo = ta.lowest(low, liqLook)[1]
+bullLiq = low < lo and close > lo
+bearLiq = high > hi and close < hi
+
+// ========== LTF: MSS (Market Structure Shift) ==========
+ph = ta.pivothigh(high, mssLen, mssLen)
+pl = ta.pivotlow(low, mssLen, mssLen)
+
+var float sph = na
+var float spl = na
+if not na(ph)
+    sph := ph
+if not na(pl)
+    spl := pl
+
+bullMSS = not na(sph) and not na(spl) and low < spl and close > sph
+bearMSS = not na(sph) and not na(spl) and high > sph and close < spl
+
+// ========== LTF: Entry FVG ==========
+bullFVG = low[2] > high[0]
+bearFVG = high[2] < low[0]
+
+// ========== Entry Logic ==========
+buy  = htfBullZone and bullLiq and bullMSS and bullFVG
+sell = htfBearZone and bearLiq and bearMSS and bearFVG
+
+// ========== Execute ==========
+if buy
+    strategy.entry("Long", strategy.long)
+    strategy.alert_message("{\"side\":\"BUY\",\"ticker\":\"" + syminfo.ticker + "\",\"price\":" + str.tostring(close) + ",\"timeframe\":\"" + timeframe.period + "\",\"chartImg\":\"{{chart_image_url}}\"}")
+    if showLbl
+        label.new(bar_index, low, "BUY\nHTF+Liq+MSS+FVG", style=label.style_label_up, color=color.new(#00ff00, 40), textcolor=color.white)
+
+if sell
+    strategy.entry("Short", strategy.short)
+    strategy.alert_message("{\"side\":\"SELL\",\"ticker\":\"" + syminfo.ticker + "\",\"price\":" + str.tostring(close) + ",\"timeframe\":\"" + timeframe.period + "\",\"chartImg\":\"{{chart_image_url}}\"}")
+    if showLbl
+        label.new(bar_index, high, "SELL\nHTF+Liq+MSS+FVG", style=label.style_label_down, color=color.new(#ff0000, 40), textcolor=color.white)
+
+if showLbl
+    if htfBullZone
+        label.new(bar_index, high, "HTF Bull", style=label.style_label_left, color=color.new(#00ff00, 50), textcolor=color.white, size=size.tiny)
+    if htfBearZone
+        label.new(bar_index, low, "HTF Bear", style=label.style_label_right, color=color.new(#ff0000, 50), textcolor=color.white, size=size.tiny)
